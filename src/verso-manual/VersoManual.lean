@@ -161,7 +161,6 @@ def paragraph : DirectiveExpander
     pure #[val]
   | _, _ => Lean.Elab.throwUnsupportedSyntax
 
-
 structure Config where
   destination : System.FilePath := "_out"
   maxTraversals : Nat := 20
@@ -297,9 +296,9 @@ def traverse (logError : String → IO Unit) (text : Part Manual) (config : Conf
   return (text, state)
 
 
-
 open IO.FS in
 def emitTeX (logError : String → IO Unit) (config : Config) (text : Part Manual) : ReaderT ExtensionImpls IO Unit := do
+  -- dbg_trace s!"docstring invoked with {repr text}"
   let (text, state) ← traverse logError text config
   let opts : TeX.Options Manual (ReaderT ExtensionImpls IO) := {
     headerLevels := #["chapter", "section", "subsection", "subsubsection", "paragraph"],

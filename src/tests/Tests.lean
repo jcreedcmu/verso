@@ -5,6 +5,30 @@ Author: David Thrane Christiansen
 -/
 
 import VersoSearch.PorterStemmer
+import VersoManual
+
+
+def testTexMain : IO Unit := open Verso Genre Manual in do
+ let logError (msg : String) := IO.eprintln msg
+ let cfg : Config := {
+   destination := "/tmp/_out",
+   emitTeX := true,
+   emitHtmlMulti := false,
+   }
+ let part : Doc.Part Manual := Doc.Part.mk #[] "title" none #[] #[]
+ let exts : ExtensionImpls := (ExtensionImpls.fromLists [] [])
+ let z2 := #[Verso.Doc.Arg.anon
+    (Verso.Doc.ArgVal.name
+      { raw := Lean.Syntax.ident
+                 (Lean.SourceInfo.original "".toSubstring { byteIdx := 453 } "".toSubstring { byteIdx := 456 })
+                 "foo".toSubstring
+                 `foo
+                 [] })]
+ let w := docstring z2 #[]
+
+ let z := ReaderT.run (emitTeX logError cfg part) exts
+ _ ← z
+ return
 
 open Verso.Search.Stemmer.Porter in
 def testStemmer : IO Unit := do
@@ -25,7 +49,7 @@ def testStemmer : IO Unit := do
       IO.eprintln s!"{x} --> {s} (wanted '{y}')"
     throw <| IO.userError "Stemmer tests failed"
 
-def tests := [testStemmer]
+def tests := [testStemmer, testTexMain]
 
 def main : IO UInt32 := do
   let mut failures := 0
