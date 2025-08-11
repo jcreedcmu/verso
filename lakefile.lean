@@ -52,6 +52,12 @@ lean_exe «verso-tests» where
   srcDir := "src/tests"
 
 @[default_target]
+lean_exe integration where
+  root := `Integration
+  srcDir := "src/tests"
+  needs := #[Verso]
+
+@[default_target]
 lean_exe «verso-demo» where
   root := `Main
   -- Enables the use of the Lean interpreter by the executable (e.g.,
