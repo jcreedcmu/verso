@@ -5,10 +5,19 @@ import VersoManual
 open Verso Genre Manual
 open Lean
 
-open Parser (ParserFn sepByFn manyFn blankLine atomicFn Parser nodeFn takeWhileFn eatSpaces ignoreFn chFn eoiFn bolThen strFn)
+open Parser (ParserFn sepByFn manyFn blankLine atomicFn Parser nodeFn takeWhileFn eatSpaces ignoreFn chFn eoiFn bolThen strFn ppGroup many)
+open Parser.Term (structInstLVal)
+
+meta def fooParser : Parser where
+  fn := strFn "foo"
+
+
+def structInstField := ppGroup <| leading_parser
+  Parser.ident >> Parser.optional Parser.Term.structInstFieldDeclParser
+
 
 meta def contents : Parser :=
-   (Parser.sepByIndent Parser.Term.structInstField ", " (allowTrailingSep := true ))
+   (Parser.sepByIndent structInstField ", " (allowTrailingSep := true ))
 
 open Lean.Parser.Term in
 def metadataBlock : ParserFn :=
