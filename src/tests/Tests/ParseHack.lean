@@ -13,7 +13,7 @@ meta def fooParser : Parser where
 
 
 def structInstField := ppGroup <| leading_parser
-  Parser.ident >> Parser.optional Parser.Term.structInstFieldDeclParser
+  Parser.ident >> Parser.Term.structInstFieldDeclParser
 
 
 meta def contents : Parser :=
@@ -43,13 +43,6 @@ elab "#mydocs" text:docco "::::::" : command => do
 %%%
 foo := "bar"
 baz := "blap",
-%%%
-::::::
-
-#mydocs
-%%%
-foo := "bar"
-baz
 %%%
 ::::::
 
