@@ -1,12 +1,8 @@
 import Lean
-import Verso
-import VersoManual
-
-open Verso Genre Manual
 open Lean
-open Parser (ParserFn Parser)
+open Parser (ParserFn Parser atomic termParser optionalFn)
 
-def myStrFn (str : String) : ParserFn := fun c s =>
+def strFn (str : String) : ParserFn := fun c s =>
     let rec go (iter : String.Iterator) (s : Parser.ParserState) :=
       if iter.atEnd then s
       else
@@ -14,13 +10,10 @@ def myStrFn (str : String) : ParserFn := fun c s =>
         go iter.next <| Parser.satisfyFn (· == ch) ch.toString c s
     go str.iter s
 
-open Lean.Parser.Term in
-def myContents : ParserFn :=
-    (Parser.atomic Parser.termParser).fn >> Parser.optionalFn (myStrFn ",") >>
-    myStrFn "%%\n"
 
 def myParser : Parser where
-  fn := myContents
+  fn := (atomic Parser.termParser).fn >> optionalFn (strFn ",") >> optionalFn (strFn "\n") >>
+        strFn "%%\n"
 
 @[combinator_parenthesizer myParser] def myParser.parenthesizer := PrettyPrinter.Parenthesizer.visitToken
 @[combinator_formatter myParser] def myParser.formatter := PrettyPrinter.Formatter.visitAtom Name.anonymous
@@ -29,10 +22,11 @@ elab "#mytest" p:myParser "::::::" : command => do
   IO.println (s!"mytest output: {p}")
 
 #mytest
-abc,%%
+abc,
+%%
 ::::::
 
-
 #mytest
-abc%%
+abc
+%%
 ::::::
