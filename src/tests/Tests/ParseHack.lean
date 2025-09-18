@@ -8,16 +8,8 @@ open Lean
 open Parser (ParserFn sepByFn manyFn blankLine atomicFn Parser nodeFn takeWhileFn eatSpaces ignoreFn chFn eoiFn bolThen strFn ppGroup many)
 open Parser.Term (structInstLVal)
 
-meta def fooParser : Parser where
-  fn := strFn "foo"
-
-
-def structInstField := ppGroup <| leading_parser
-  Parser.ident >> Parser.Term.structInstFieldDeclParser
-
-
 meta def contents : Parser :=
-   (Parser.sepByIndent structInstField ", " (allowTrailingSep := true ))
+   (Parser.sepByIndent Parser.termParser "," (allowTrailingSep := true ))
 
 open Lean.Parser.Term in
 def metadataBlock : ParserFn :=
@@ -41,8 +33,8 @@ elab "#mydocs" text:docco "::::::" : command => do
 
 #mydocs
 %%%
-foo := "bar"
-baz := "blap",
+1
+2,
 %%%
 ::::::
 
@@ -50,14 +42,14 @@ elab "#debug" txt:str : command => do
   IO.println (← docco.fn.test txt.getString)
 
 #debug r#"%%%
-foo := "bar"
-baz := "blap"
+1
+2
 %%%
 "#
 
 #mydocs
 %%%
-foo := "bar"
-baz := "blap"
+1
+2
 %%%
 ::::::
