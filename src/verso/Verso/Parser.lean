@@ -224,7 +224,7 @@ def strFn (str : String) : ParserFn := asStringFn <| fun c s =>
   let iniPos := s.pos
   let iniSz := s.stxStack.size
   let s := go str.iter s
-  if s.hasError then s.mkErrorAt s!"'{str}'" iniPos (some iniSz) else s
+  if s.hasError then s.mkErrorAt s!"str fun error '{str}'" iniPos (some iniSz) else s
 
 inductive OrderedListType where
    /-- Items like 1. -/

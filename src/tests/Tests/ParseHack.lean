@@ -9,9 +9,7 @@ open Parser (ParserFn sepByFn manyFn blankLine atomicFn Parser nodeFn
 
 open Lean.Parser.Term in
 def myContents : ParserFn :=
-  nodeFn ``Doc.Syntax.metadata_block <|
-    strFn "%%%" >> ignoreFn (chFn '\n') >>
-    (Parser.sepBy Parser.termParser "," (allowTrailingSep := true )).fn >>
+    (Parser.sepBy (Parser.atomic Parser.termParser) "," (allowTrailingSep := true )).fn >>
     strFn "%%%" >> ignoreFn (chFn '\n')
 
 def myParser : Parser where
@@ -24,7 +22,6 @@ elab "#mytest" p:myParser "::::::" : command => do
   IO.println (s!"mytest output: {p}")
 
 #mytest
-%%%
 identifier,
 %%%
 ::::::
@@ -32,13 +29,10 @@ identifier,
 elab "#debug" txt:str : command => do
   IO.println (← myParser.fn.test txt.getString)
 
-#debug r#"%%%
-identifier
-%%%
+#debug r#"identifier %%%
 "#
 
 #mytest
-%%%
 identifier
 %%%
 ::::::
