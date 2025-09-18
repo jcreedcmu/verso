@@ -4,52 +4,41 @@ import VersoManual
 
 open Verso Genre Manual
 open Lean
-
-open Parser (ParserFn sepByFn manyFn blankLine atomicFn Parser nodeFn takeWhileFn eatSpaces ignoreFn chFn eoiFn bolThen strFn ppGroup many)
-open Parser.Term (structInstLVal)
-
-meta def contents : Parser :=
-   (Parser.sepByIndent Parser.termParser "," (allowTrailingSep := true ))
+open Parser (ParserFn sepByFn manyFn blankLine atomicFn Parser nodeFn
+             takeWhileFn eatSpaces ignoreFn chFn eoiFn bolThen strFn ppGroup many)
 
 open Lean.Parser.Term in
-def metadataBlock : ParserFn :=
+def myContents : ParserFn :=
   nodeFn ``Doc.Syntax.metadata_block <|
-    opener >>
-    contents.fn >>
-    closer
-where
-  opener := strFn "%%%" >> ignoreFn (chFn '\n')
-  closer := strFn "%%%" >> ignoreFn (chFn '\n')
+    strFn "%%%" >> ignoreFn (chFn '\n') >>
+    (Parser.sepBy Parser.termParser "," (allowTrailingSep := true )).fn >>
+    strFn "%%%" >> ignoreFn (chFn '\n')
 
-def docco : Parser where
-  fn := metadataBlock
+def myParser : Parser where
+  fn := myContents
 
-@[combinator_parenthesizer docco] def docco.parenthesizer := PrettyPrinter.Parenthesizer.visitToken
-@[combinator_formatter docco] def docco.formatter := PrettyPrinter.Formatter.visitAtom Name.anonymous
+@[combinator_parenthesizer myParser] def myParser.parenthesizer := PrettyPrinter.Parenthesizer.visitToken
+@[combinator_formatter myParser] def myParser.formatter := PrettyPrinter.Formatter.visitAtom Name.anonymous
 
+elab "#mytest" p:myParser "::::::" : command => do
+  IO.println (s!"mytest output: {p}")
 
-elab "#mydocs" text:docco "::::::" : command => do
-  IO.println (s!"mydocs output: {text}")
-
-#mydocs
+#mytest
 %%%
-1
-2,
+identifier,
 %%%
 ::::::
 
 elab "#debug" txt:str : command => do
-  IO.println (← docco.fn.test txt.getString)
+  IO.println (← myParser.fn.test txt.getString)
 
 #debug r#"%%%
-1
-2
+identifier
 %%%
 "#
 
-#mydocs
+#mytest
 %%%
-1
-2
+identifier
 %%%
 ::::::
