@@ -22,20 +22,18 @@ structure Config where
 Returns all non-directory filepaths that are children of `root`, which
 must be a directory. Returns these as paths relative to `root`.
 
-XXX: use walkDir instead?
+This differs from `System.FilePath.walkRoot`, in that the latter returns
+absolute paths, and includes subdirectories.
 -/
-partial def filesBelow (root : System.FilePath) (extension : System.FilePath := ".") :
-    IO (Array System.FilePath) := do
-  let base := root / extension
-  if !(← base.isDir) then
-    throw (.userError s!"tried to find files below {root} {extension}, which not a directory")
-  -- There is some extra conversion between lists and arrays because
-  -- Array.partitionM doesn't seem to exist.
-  let kids := (← base.readDir).toList.map (·.fileName)
-  let (dirKids, fileKids) ← kids |>.partitionM (fun (kid : String) => (base / kid).isDir )
-  let fileResults :=  fileKids.toArray.map (extension / show String from ·)
-  let recResults := (← dirKids.toArray.mapM (fun (dir : String) => filesBelow root (extension / dir))).flatten
-  pure <| fileResults ++ recResults
+partial def filesBelow (root : System.FilePath) :
+    IO (Array System.FilePath) := Prod.snd <$> StateT.run (go ".") #[]
+where
+  go (p : System.FilePath) := do
+    for d in (← (root / p).readDir) do
+      if ← d.path.isDir then
+        go (p / d.fileName)
+      else
+        modify (·.push (p / d.fileName))
 
 /-- Main test runner -/
 def runTests (config : Config) : IO Unit := do
@@ -51,7 +49,7 @@ def runTests (config : Config) : IO Unit := do
   if config.updateExpected then
     IO.println s!"Updating expected outputs in {config.testDir}..."
     IO.FS.removeDirAll expectedRoot
-    IO.println "TODO: cp -r outputRoot expectedRoot"
+    IO.println s!"TODO: cp -r {outputRoot} {expectedRoot}"
   else
     IO.println s!"Running test in {config.testDir}..."
     if ← outputRoot.pathExists then
@@ -66,5 +64,15 @@ def runTests (config : Config) : IO Unit := do
       IO.println s!"Expected files in {expectedRoot}:\n  {expectedFiles}"
       IO.println s!"Actual files in {outputRoot}:\n  {outputFiles}"
       throw <| .userError s!"Test in {config.testDir} failed"
+
+    for file in expectedFiles do
+      let expected ← IO.FS.readFile (expectedRoot / file)
+      let actual ← IO.FS.readFile (outputRoot / file)
+      if expected != actual then
+        let d := Lean.Diff.diff (expected.split (· == '\n') |>.toArray) (actual.split (· == '\n') |>.toArray)
+        IO.println s!"✗ In test {config.testDir}, output file {file}"
+        IO.println s!"  Expected output differs from actual output"
+        IO.println (Lean.Diff.linesToString d)
+        throw <| .userError s!"Test in {config.testDir} failed"
 
   return
