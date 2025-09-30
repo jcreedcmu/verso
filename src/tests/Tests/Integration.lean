@@ -18,61 +18,53 @@ structure Config where
   /-- How to run the test -/
   runTest : IO Unit
 
-/-- Statistics for a test run. -/
-structure TestStats where
-  /-- The number of passing tests. -/
-  passed : Nat := 0
-  /-- The number of failing tests. -/
-  failed : Nat := 0
-  /-- The number of test that couldn't run. -/
-  errors : Nat := 0
+/--
+Returns all non-directory filepaths that are children of `root`, which
+must be a directory. Returns these as paths relative to `root`.
 
-/-- The total number of tests from a given run. -/
-def TestStats.total (stats : TestStats) : Nat :=
-  stats.passed + stats.failed + stats.errors
-
-/-- Print final statistics -/
-def printStats (stats : TestStats) : IO Unit := do
-  let total := stats.total
-  IO.println ""
-  IO.println s!"Tests run: {total}"
-  IO.println s!"Passed: {stats.passed}"
-  if stats.failed > 0 then
-    IO.println s!"Failed: {stats.failed}"
-  if stats.errors > 0 then
-    IO.println s!"Errors: {stats.errors}"
-
-  if stats.failed == 0 && stats.errors == 0 then
-    IO.println "All tests passed! ✓"
-  else
-    IO.println s!"Some tests failed. ✗"
+XXX: use walkDir instead?
+-/
+partial def filesBelow (root : System.FilePath) (extension : System.FilePath := ".") :
+    IO (Array System.FilePath) := do
+  let base := root / extension
+  if !(← base.isDir) then
+    throw (.userError s!"tried to find files below {root} {extension}, which not a directory")
+  -- There is some extra conversion between lists and arrays because
+  -- Array.partitionM doesn't seem to exist.
+  let kids := (← base.readDir).toList.map (·.fileName)
+  let (dirKids, fileKids) ← kids |>.partitionM (fun (kid : String) => (base / kid).isDir )
+  let fileResults :=  fileKids.toArray.map (extension / show String from ·)
+  let recResults := (← dirKids.toArray.mapM (fun (dir : String) => filesBelow root (extension / dir))).flatten
+  pure <| fileResults ++ recResults
 
 /-- Main test runner -/
 def runTests (config : Config) : IO Unit := do
   unless ← System.FilePath.pathExists config.testDir do
     throw <| .userError s!"Test directory not found: {config.testDir}"
 
-  config.runTest
+  let expectedRoot := config.testDir / "expected"
+  let outputRoot := config.testDir / "output"
 
-  -- let inputFiles ← findInputFiles config.testDir
+  unless ← System.FilePath.pathExists expectedRoot do
+    throw <| .userError s!"Expected output directory not found: {expectedRoot}"
 
-  -- if inputFiles.isEmpty then
-  --   IO.println s!"No .input files found in {config.testDir}"
-  --   return
+  if config.updateExpected then
+    IO.println s!"Updating expected outputs in {config.testDir}..."
+    IO.FS.removeDirAll expectedRoot
+    IO.println "TODO: cp -r outputRoot expectedRoot"
+  else
+    IO.println s!"Running test in {config.testDir}..."
+    if ← outputRoot.pathExists then
+      IO.FS.removeDirAll outputRoot
+    config.runTest
 
-  -- if config.updateExpected then
-  --   IO.println s!"Updating expected outputs in {config.testDir}..."
-  -- else
-  --   IO.println s!"Running tests in {config.testDir}..."
-  -- IO.println ""
+    let expectedFiles := (← filesBelow expectedRoot)
+    let outputFiles := (← filesBelow outputRoot)
 
-  let mut stats : TestStats := {}
-  -- for inputFile in inputFiles do
-  --   let result ← runSingleTest config inputFile
-  --   result.print
-  --   stats := stats.add result
+    if expectedFiles != outputFiles then
+      IO.println s!"✗ Expected files differ from actual files"
+      IO.println s!"Expected files in {expectedRoot}:\n  {expectedFiles}"
+      IO.println s!"Actual files in {outputRoot}:\n  {outputFiles}"
+      throw <| .userError s!"Test in {config.testDir} failed"
 
-  printStats stats
-
-  if stats.failed == 0 && stats.errors == 0 then return
-  else throw <| .userError s!"Failed with {stats.failed} failures and {stats.errors} errors"
+  return
