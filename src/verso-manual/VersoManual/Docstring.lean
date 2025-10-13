@@ -648,11 +648,14 @@ where
 }
 "
 
-
 @[block_extension Block.docstringSection]
 def docstringSection.descr : BlockDescr where
   traverse _ _ _ := pure none
-  toTeX := some fun _goI goB _id _info contents => contents.mapM goB
+  toTeX := some fun _goI goB _id info contents =>
+    open Verso.Output.TeX in do
+    let .ok header := FromJson.fromJson? (α := String) info
+      | IO.println "Failed to deserialize docstring section data while generating TeX"; return .empty -- TODO why can't do logError?
+    pure \TeX{\par\noindent\textbf{\Lean{header}}\par " " \Lean{.seq (← contents.mapM goB)}}
   toHtml := some fun _goI goB _id info contents =>
     open Verso.Doc.Html HtmlT in
     open Verso.Output Html in do
@@ -754,7 +757,14 @@ def fieldSignature.descr : BlockDescr where
 @[block_extension Block.constructorSignature]
 def constructorSignature.descr : BlockDescr where
   traverse _ _ _ := pure none
-  toTeX := some fun _goI goB _id _ contents => contents.mapM goB -- TODO
+  toTeX := some fun _goI goB _id info contents =>
+    open Verso.Output.TeX in do
+      let .ok signature := FromJson.fromJson? (α := Highlighted) info
+        | IO.println "Failed to deserialize docstring section data while generating TeX"; pure .empty
+      let signat := signature.toTeX
+      pure \TeX{\Lean{signat} \par " " \Lean{← contents.mapM goB}}
+
+
   toHtml := some fun _goI goB _id info contents =>
     open Verso.Doc.Html HtmlT in
     open Verso.Output Html in do
@@ -862,8 +872,13 @@ def docstring.descr : BlockDescr := withHighlighting {
     let names := #[name.getString!, name.toString]
     pure <| names.map fun s => (s, {{<code>{{s}}</code>}})
 
+  toTeX := some <| fun _goI goB _id info contents =>
+    open Verso.Output.TeX in do
+      let .ok (_name, declType, _signature, customLabel) := FromJson.fromJson? (α := Name × Block.Docstring.DeclType × Signature × Option String) info
+        | IO.println "Failed to deserialize docstring data while generating TeX"; return .empty
+      let label := customLabel.getD declType.label
+      pure \TeX{\begin{docstringBox}{\Lean{label}} \Lean{← contents.mapM goB} \end{docstringBox}}
 
-  toTeX := some <| fun _goI goB _id _info contents => contents.mapM goB
   extraCss := [docstringStyle]
 }
 where

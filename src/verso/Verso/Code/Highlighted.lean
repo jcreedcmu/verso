@@ -10,6 +10,7 @@ import SubVerso.Highlighting
 import Verso.Doc
 import Verso.Method
 import Verso.Output.Html
+import Verso.Output.TeX
 import Verso.Instances.Deriving
 
 open SubVerso.Highlighting
@@ -532,6 +533,10 @@ def _root_.Array.mapIndexedM [Monad m] (arr : Array α) (f : Fin arr.size → α
   for h : i in [:arr.size] do
     out := out.push (← f ⟨i, by get_elem_tactic⟩ arr[i])
   pure out
+
+open Verso.Output.TeX in
+partial defmethod Highlighted.toTeX : Highlighted → Verso.Output.TeX
+  | _ => \TeX{"[TODO DX]"}
 
 partial defmethod Highlighted.toHtml : Highlighted → HighlightHtmlM g Html
   | .token t => t.toHtml
