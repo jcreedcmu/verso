@@ -534,10 +534,6 @@ def _root_.Array.mapIndexedM [Monad m] (arr : Array α) (f : Fin arr.size → α
     out := out.push (← f ⟨i, by get_elem_tactic⟩ arr[i])
   pure out
 
-open Verso.Output.TeX in
-partial defmethod Highlighted.toTeX : Highlighted → Verso.Output.TeX
-  | _ => \TeX{"[TODO DX]"}
-
 partial defmethod Highlighted.toHtml : Highlighted → HighlightHtmlM g Html
   | .token t => t.toHtml
   | .text str | .unparsed str => pure {{<span class="inter-text">{{str}}</span>}}
