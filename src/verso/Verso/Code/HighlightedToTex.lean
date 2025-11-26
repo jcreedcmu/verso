@@ -12,6 +12,20 @@ open Verso.Output
 open Lean (Json ToJson FromJson Quote)
 open Std (HashMap)
 
+/-
+These two theorems justify termination of `containsNewline` below
+in the face of its use of `Array.any`. They can be removed if these
+land in `lean4` proper.
+-/
+@[wf_preprocess] theorem any_wfParam {xs : Array α} {f : α → Bool} :
+    (wfParam xs).any f = xs.attach.unattach.any f := by
+  simp [wfParam]
+
+@[wf_preprocess] theorem any_unattach {P : α → Prop} {xs : Array (Subtype P)} {f : α → Bool} :
+    xs.unattach.any f = xs.any fun ⟨x, h⟩ =>
+      binderNameHint x f <| binderNameHint h () <| f (wfParam x) := by
+  simp [wfParam]
+
 namespace SubVerso.Highlighting.Highlighted
 
 def trimOneLeadingNl : Highlighted → Highlighted
@@ -43,6 +57,15 @@ def trimOneTrailingNl : Highlighted → Highlighted
   | hl@(.point ..) | hl@(.token ..) => hl
   | .tactics i s e hl => .tactics i s e (trimOneTrailingNl hl)
   | .span i hl => .span i (trimOneTrailingNl hl)
+
+def containsNewline (t : Highlighted) : Bool := match t with
+  | .text s => s.contains '\n'
+  | .unparsed s => s.contains '\n'
+  | .seq xs => xs.any containsNewline
+  | (.point ..) | (.token ..) => False
+  | .tactics _ _ _ hl => hl.containsNewline
+  | .span _ hl => hl.containsNewline
+termination_by t
 
 end SubVerso.Highlighting.Highlighted
 
@@ -123,13 +146,18 @@ defmethod Highlighted.toVerbatimTeX : Highlighted → Verso.Output.TeX
 def verbatim (t : Verso.Output.TeX) : Verso.Output.TeX :=
   .seq #[.raw "\\LeanVerb|", t, .raw "|"]
 
+def verbatimBlock (t : Verso.Output.TeX) : Verso.Output.TeX :=
+  .seq #[.raw "\\begin{LeanVerbatim}\n", t, .raw "\n\\end{LeanVerbatim}\n"]
+
 defmethod Highlighting.Token.toTeX (t : Highlighting.Token) : Verso.Output.TeX :=
   verbatim (t.toVerbatimTeX)
 
 defmethod Highlighted.toTeX (t : Highlighted) : Verso.Output.TeX :=
-  let strip := t.trimOneTrailingNl
+  let strip := t.trimOneTrailingNl.trimOneLeadingNl
   if strip.isEmpty then
     .empty
+  else if strip.containsNewline then
+    verbatimBlock (strip.toVerbatimTeX)
   else
     verbatim (strip.toVerbatimTeX)
 
