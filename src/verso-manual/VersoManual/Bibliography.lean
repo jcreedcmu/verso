@@ -253,7 +253,7 @@ inline_extension Inline.cite (citations : List Citable) (style : Style := .paren
         if citedSet.binSearchContains v.1 (cmpCite · · == .lt) then pure ()
         else modify (·.set `Manual.Bibliography <| citedSet.binInsert (cmpCite · · == .lt) v.1)
       pure none -- TODO disambiguate years
-  toTeX := none
+  toTeX := some <| fun _ _ _ _ => pure (.text "XXX placeholder inline cite")
   extraCss := [Marginalia.css]
   toHtml :=
     open Verso.Output.Html in

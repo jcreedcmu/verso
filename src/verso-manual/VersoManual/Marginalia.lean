@@ -98,7 +98,10 @@ def Marginalia.html (content : Html) : Html :=
 inline_extension Inline.margin where
   traverse _ _ _ := do
     pure none
-  toTeX := none
+  toTeX :=
+  open Verso.Output.TeX in
+  some <| fun goI _ _ content => do
+    pure <| \TeX{ \marginpar{ \Lean{ ← content.mapM goI } } }
   extraCss := [Marginalia.css]
   toHtml :=
     open Verso.Output.Html in
