@@ -181,7 +181,7 @@ end
 block_extension Block.exampleLeanFile (filename : String) where
   data := .str filename
   traverse _ _ _ := pure none
-  toTeX := none
+  toTeX := some <| fun _ _ _ _ _ => pure (.text "XXX placeholder example Lean file")
   extraCss := [exampleFileCss]
   toHtml := open Verso.Output Html in
     some <| fun _ goB _ data blocks => do
