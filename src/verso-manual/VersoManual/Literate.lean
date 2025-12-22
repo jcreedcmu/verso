@@ -47,9 +47,24 @@ block_extension Block.literateDocstringPart (level : Nat) where
         {{← contents.mapM goB}}
       </section>
     }}
-  toTeX := some fun goI goB _id data contents => do
-    pure (.raw "XXX placeholder literateDocstringPart")
-
+  toTeX := some fun goI goB _id data contents =>
+    open Verso.Output.TeX in do
+      let .ok (level : Nat) := FromJson.fromJson? data
+        | Verso.Doc.TeX.logError s!"Couldn't decode nesting level from {data.compress}"
+          pure .empty
+      let title : TeX ←
+        if let some title := contents[0]? then
+          if let .para xs := title then
+            xs.mapM goI
+          else
+            Verso.Doc.TeX.logError s!"Expected a paragraph at the beginning of a docstring section"
+            pure .empty
+        else
+          Verso.Doc.TeX.logError s!"Expected a block at the beginning of a docstring section"
+          pure .empty
+      let contents := contents.extract 1
+      let sectionHeader ← Doc.TeX.headerLevel title level
+      pure <| (sectionHeader ++ (← contents.mapM goB))
 
 instance : LoadLiterate Manual where
   inline goI
