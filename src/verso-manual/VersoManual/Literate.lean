@@ -20,7 +20,8 @@ block_extension Block.literateDocstring where
   traverse _ _ _ _ := pure none
   toHtml := some fun _goI goB _id _data contents => do
     pure {{<div class="literate-docstring">{{← contents.mapM goB}}</div>}}
-  toTeX := none
+  toTeX := some fun _goI goB _id _data contents => do
+    contents.mapM goB
 
 block_extension Block.literateDocstringPart (level : Nat) where
   data := level
@@ -46,7 +47,8 @@ block_extension Block.literateDocstringPart (level : Nat) where
         {{← contents.mapM goB}}
       </section>
     }}
-  toTeX := none
+  toTeX := some fun goI goB _id data contents => do
+    pure (.raw "XXX placeholder literateDocstringPart")
 
 
 instance : LoadLiterate Manual where
