@@ -125,10 +125,13 @@ public def verbatimInline [Monad m] [GenreTeX g m] (t : TeX) : TeXT g m Verso.Ou
   then pure (.seq #[.raw "\\texttt{", t, .raw "}"]) -- TODO: better escaping for texttt
   else pure (.seq #[.raw "\\LeanVerb|", t, .raw "|"])
 
+public def makeLink (url : String) (content : TeX) : TeX :=
+  \TeX{\href{\Lean{.raw (escapeForTexHref url)}}{\Lean{content}}}
+
 public partial defmethod Inline.toTeX [Monad m] [GenreTeX g m] : Inline g → TeXT g m TeX
   | .text str => pure <| .text str
   | .link content dest => do
-    pure \TeX{\href{\Lean{.raw (escapeForTexHref dest)}}{\Lean{← content.mapM Inline.toTeX}}}
+    pure <| makeLink dest (← content.mapM Inline.toTeX)
   | .image _alt dest => do
     pure \TeX{\includegraphics{\Lean{.raw (toString (repr dest))}}} -- TODO link destinations
   | .footnote _name txt => do
