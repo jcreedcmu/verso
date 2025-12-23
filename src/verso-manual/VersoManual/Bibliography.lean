@@ -134,6 +134,9 @@ private def andList (xs : Array Html) : Html :=
     open Html in
     (xs.extract 0 (xs.size - 1)).foldr (init := {{" and " {{xs.back!}} }}) (· ++ ", " ++ ·)
 
+private def andListTeX (xs : Array TeX) : TeX :=
+  .text "stub"
+
 partial def Bibliography.lastName (inl : Doc.Inline Manual) : Doc.Inline Manual :=
   let ws := words inl
   if _ : ws.size = 0 then inl
@@ -181,6 +184,32 @@ where
     | none => title
     | some u => {{<a href={{u}}>{{title}}</a>}}
 
+open Verso.Doc.TeX in
+open Verso.Output.TeX in
+def Citable.bibTeX (go : Doc.Inline Genre.Manual → TeXT Manual (ReaderT ExtensionImpls IO) TeX) (c : Citable) : TeXT Manual (ReaderT ExtensionImpls IO) TeX :=   wrap <$> open TeX in do
+  match c with
+  | .inProceedings p =>
+    let authors ← andListTeX <$> p.authors.mapM go
+    return .text "stub"
+    -- return {{ {{authors}} s!", {p.year}. " {{ link {{"“" {{← go p.title}} "”"}} }} ". In " <em>{{← go p.booktitle}}"."</em>{{(← p.series.mapM go).map ({{" (" {{·}} ")" }}) |>.getD .empty}} }}
+  | .article p =>
+    let authors ← andListTeX <$> p.authors.mapM go
+    return .text "stub"
+    -- return {{ {{authors}} " (" {{(← p.month.mapM go).map (· ++ {{" "}}) |>.getD .empty}}s!"{p.year}" "). " {{ link {{"“" {{← go p.title}} "”"}} }} ". " <em>{{← go p.journal}}"."</em> <strong>{{← go p.volume}}</strong>" "{{← go p.number}} {{p.pages.map (fun (x, y) => s!"pp. {x}–{y}") |>.getD .empty }}  "."}}
+  | .thesis p =>
+    -- return {{ {{← go p.author}} s!", {p.year}. " <em>{{link (← go p.title)}}</em> ". " {{← go p.degree}} ", " {{← go p.university}} }}
+    return .text "stub"
+  | .arXiv p =>
+    let authors ← andListTeX <$> p.authors.mapM go
+    -- return {{ {{authors}} s!", {p.year}. " {{ link {{"“" {{← go p.title}} "”"}} }} ". arXiv:" {{p.id}} }}
+    return .text "stub"
+where
+  wrap (content : TeX) : TeX := content
+  link (title : TeX) : TeX :=
+    match c.url with
+    | none => title
+    | some u => \TeX{\hyperref{\Lean{u} }{\Lean{title} } }
+
 def Citable.inlineHtml
     (go : Doc.Inline Genre.Manual → HtmlT Manual (ReaderT ExtensionImpls IO) Html)
     (ps : List Citable)
@@ -208,6 +237,35 @@ where
     else if h : p.authors.size > 3 then
       (· ++ {{<em>"et al"</em>}}) <$> go (Bibliography.lastName p.authors[0])
     else andList <$> p.authors.mapM (go ∘ Bibliography.lastName)
+
+open Verso.Doc.TeX in
+def Citable.inlineTeX
+    (go : Doc.Inline Genre.Manual → TeXT Manual (ReaderT ExtensionImpls IO) Output.TeX)
+    (ps : List Citable)
+    (fmt : Style) :
+    TeXT Manual (ReaderT ExtensionImpls IO) TeX := open TeX in do
+  match fmt with
+  | .textual =>
+    let out : Array TeX ← ps.toArray.mapM fun p => do
+      let m ← p.bibTeX go
+      pure <| \TeX{\Lean{ ← authorTeX p} } -- stub {{ {{← authorTeX p}} s!" ({p.year})"}} ++ Marginalia.TeX m
+    pure <| andListTeX out
+  | .parenthetical =>
+    let out : Array TeX ← ps.toArray.mapM fun p => do
+      let m ← p.bibTeX go
+      pure .empty -- stub <| {{" (" {{← authorTeX p}} s!", {p.year})"}} ++ Marginalia.TeX m
+    pure <| andListTeX out
+  | .here => do
+    pure <| andListTeX (← ps.toArray.mapM (·.bibTeX go))
+where
+  authorTeX p := open TeX in do
+    if p.authors.size = 0 then
+      pure .empty
+    else if h : p.authors.size = 1 then
+      go <| Bibliography.lastName p.authors[0]
+    else if h : p.authors.size > 3 then
+      (· ++ \TeX{\em{"et al"} }) <$> go (Bibliography.lastName p.authors[0])
+    else andListTeX <$> p.authors.mapM (go ∘ Bibliography.lastName)
 
 private def arrayOrd (ord : Ord α) : Ord (Array α) := inferInstance
 
@@ -253,7 +311,16 @@ inline_extension Inline.cite (citations : List Citable) (style : Style := .paren
         if citedSet.binSearchContains v.1 (cmpCite · · == .lt) then pure ()
         else modify (·.set `Manual.Bibliography <| citedSet.binInsert (cmpCite · · == .lt) v.1)
       pure none -- TODO disambiguate years
-  toTeX := some <| fun _ _ _ _ => pure (.text "XXX placeholder inline cite")
+  toTeX :=
+    open Verso.Output.TeX in
+    some <| fun go _ data _content => do -- TODO repurpose "content" for e.g. "page 5"
+      match FromJson.fromJson? data with
+      | .error e => TeX.logError s!"Failed to deserialize citation/style: {e}"; return .empty
+      | .ok (v : Json × Style) =>
+        match FromJson.fromJson? v.1 with
+        | .error e => TeX.logError s!"Failed to deserialize citation: {e}"; return .empty
+        | .ok (v' : List Citable) =>
+          Citable.inlineTeX go v' v.2
   extraCss := [Marginalia.css]
   toHtml :=
     open Verso.Output.Html in
