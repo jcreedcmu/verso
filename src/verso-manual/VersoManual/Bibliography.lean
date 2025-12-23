@@ -135,7 +135,11 @@ private def andList (xs : Array Html) : Html :=
     (xs.extract 0 (xs.size - 1)).foldr (init := {{" and " {{xs.back!}} }}) (· ++ ", " ++ ·)
 
 private def andListTeX (xs : Array TeX) : TeX :=
-  .text "stub"
+  if h : xs.size = 1 then xs[0]
+  else if h : xs.size = 2 then xs[0] ++ " and " ++ xs[1]
+  else
+    open TeX in
+    (xs.extract 0 (xs.size - 1)).foldr (init := \TeX{" and " \Lean{xs.back!} }) (· ++ ", " ++ ·)
 
 partial def Bibliography.lastName (inl : Doc.Inline Manual) : Doc.Inline Manual :=
   let ws := words inl
@@ -190,25 +194,48 @@ def Citable.bibTeX (go : Doc.Inline Genre.Manual → TeXT Manual (ReaderT Extens
   match c with
   | .inProceedings p =>
     let authors ← andListTeX <$> p.authors.mapM go
-    return .text "stub"
-    -- return {{ {{authors}} s!", {p.year}. " {{ link {{"“" {{← go p.title}} "”"}} }} ". In " <em>{{← go p.booktitle}}"."</em>{{(← p.series.mapM go).map ({{" (" {{·}} ")" }}) |>.getD .empty}} }}
+    return \TeX{
+       \Lean{authors}  ", "
+       \Lean{toString p.year} ". "
+       \Lean{ link \TeX{ "``" \Lean{← go p.title} "''" } } ". In "
+       \em{ \Lean{ ← go p.booktitle } "." }
+       \Lean{ (← p.series.mapM go).map (fun x => \TeX{" (" \Lean{x} ") "}) |>.getD .empty  }
+     }
   | .article p =>
     let authors ← andListTeX <$> p.authors.mapM go
-    return .text "stub"
-    -- return {{ {{authors}} " (" {{(← p.month.mapM go).map (· ++ {{" "}}) |>.getD .empty}}s!"{p.year}" "). " {{ link {{"“" {{← go p.title}} "”"}} }} ". " <em>{{← go p.journal}}"."</em> <strong>{{← go p.volume}}</strong>" "{{← go p.number}} {{p.pages.map (fun (x, y) => s!"pp. {x}–{y}") |>.getD .empty }}  "."}}
+    return \TeX{
+       \Lean{authors}  " ("
+       \Lean{ (← p.month.mapM go).map (fun x => \TeX{\Lean{x} " "}) |>.getD .empty  }
+       \Lean{toString p.year} "). "
+       \Lean{ link \TeX{ "``" \Lean{← go p.title} "''" } } ". In "
+       \em{ \Lean{ ← go p.journal } "." }
+       \Lean{ ← go p.volume } " "
+       \Lean{ ← go p.number }
+       \Lean{ p.pages.map (fun (x, y) => \TeX{\Lean{toString x} "-" \Lean{toString y} }) |>.getD .empty }
+       "."
+     }
   | .thesis p =>
-    -- return {{ {{← go p.author}} s!", {p.year}. " <em>{{link (← go p.title)}}</em> ". " {{← go p.degree}} ", " {{← go p.university}} }}
-    return .text "stub"
+    return \TeX{
+       \Lean{← go p.author}  ", "
+       \Lean{toString p.year} ". "
+       \em{ \Lean{ ← go p.title } } ". "
+       \Lean{← go p.degree} ", "
+       \Lean{← go p.university}
+     }
   | .arXiv p =>
     let authors ← andListTeX <$> p.authors.mapM go
-    -- return {{ {{authors}} s!", {p.year}. " {{ link {{"“" {{← go p.title}} "”"}} }} ". arXiv:" {{p.id}} }}
-    return .text "stub"
+    return \TeX{
+       \Lean{authors}  ", "
+       \Lean{toString p.year} ". "
+       \Lean{ link \TeX{ "``" \Lean{← go p.title} "''" } } ". arXiv:"
+       \Lean{p.id}
+     }
 where
   wrap (content : TeX) : TeX := content
   link (title : TeX) : TeX :=
     match c.url with
     | none => title
-    | some u => \TeX{\hyperref{\Lean{u} }{\Lean{title} } }
+    | some u => makeLink u title
 
 def Citable.inlineHtml
     (go : Doc.Inline Genre.Manual → HtmlT Manual (ReaderT ExtensionImpls IO) Html)
@@ -248,12 +275,20 @@ def Citable.inlineTeX
   | .textual =>
     let out : Array TeX ← ps.toArray.mapM fun p => do
       let m ← p.bibTeX go
-      pure <| \TeX{\Lean{ ← authorTeX p} } -- stub {{ {{← authorTeX p}} s!" ({p.year})"}} ++ Marginalia.TeX m
+      pure <| \TeX{
+        \Lean{ ← authorTeX p} " "
+        \Lean{toString p.year}
+        \Lean{Marginalia.TeX m}
+      }
     pure <| andListTeX out
   | .parenthetical =>
     let out : Array TeX ← ps.toArray.mapM fun p => do
       let m ← p.bibTeX go
-      pure .empty -- stub <| {{" (" {{← authorTeX p}} s!", {p.year})"}} ++ Marginalia.TeX m
+      pure <| \TeX{
+        "(" \Lean{ ← authorTeX p} ", "
+        \Lean{toString p.year} ") "
+        \Lean{Marginalia.TeX m}
+      }
     pure <| andListTeX out
   | .here => do
     pure <| andListTeX (← ps.toArray.mapM (·.bibTeX go))
